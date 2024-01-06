@@ -23,7 +23,7 @@ use crate::visit;
 use crate::IntoWeightedEdge;
 
 #[cfg(feature = "rayon")]
-use indexmap::map::rayon::ParKeys;
+use indexmap::map::rayon::{ParKeys, ParValues};
 #[cfg(feature = "rayon")]
 use rayon::{iter::plumbing::UnindexedConsumer, prelude::*};
 
@@ -398,6 +398,18 @@ where
     {
         ParNodes {
             iter: self.nodes.par_keys(),
+        }
+    }
+
+    #[cfg(feature = "rayon")]
+    pub fn par_edges(&self) -> ParEdges<'_, N, E>
+    where
+        N: Send + Sync,
+        E: Send + Sync,
+    {
+        ParEdges {
+            edges: &self.edges,
+            iter: self.edges.par_keys(),
         }
     }
 
@@ -1270,3 +1282,55 @@ where
         self.iter.drive_unindexed(c)
     }
 }
+
+/// A [ParallelIterator] over this graph's edges.
+#[cfg(feature = "rayon")]
+#[derive(Debug)]
+pub struct ParEdges<'a, N, E>
+where
+    N: Send + Sync,
+    E: Send + Sync,
+{
+    edges: &'a IndexMap<(N, N), E>,
+    iter: ParKeys<'a, (N, N), E>,
+}
+
+impl<'a, N, E> ParEdges<'a, N, E>
+where
+    N: Send + Sync + Hash + PartialEq + Eq,
+    E: Send + Sync,
+{
+    pub fn par_iter(&'a self) -> impl ParallelIterator<Item = (usize, &'a (N, N), &'a E)> {
+        self.iter
+            .clone()
+            .map(move |x| self.edges.get_full(x).unwrap())
+    }
+
+    /*
+    pub fn par_iter(self) -> impl ParallelIterator<Item = (usize, &'a (N, N), &'a E)> {
+        self.iter.clone().map(move |x| {
+            (x, self.edges)
+        })
+        .map(|(x, edges)| {
+            edges.get_full(x).unwrap()
+        })
+    }*/
+}
+
+/*
+#[cfg(feature = "rayon")]
+impl<'a, N, E> ParallelIterator for ParEdges<'a, N, E>
+where
+    N: Send + Sync,
+    E: Send + Sync,
+{
+    type Item = (N, N, &'a E);
+
+    fn drive_unindexed<C>(self, c: C) -> C::Result
+    where
+        C: UnindexedConsumer<Self::Item>,
+    {
+        self.edges.par_values().drive_unindexed(c)
+    }
+}
+*/

@@ -413,3 +413,28 @@ fn test_parallel_iterator() {
     let parallel_sum: u32 = gr.par_nodes().sum();
     assert_eq!(serial_sum, parallel_sum);
 }
+
+#[test]
+#[cfg(feature = "rayon")]
+fn test_parallel_edges_iterator() {
+    use rayon::prelude::*;
+    let mut gr: DiGraphMap<u32, u32> = DiGraphMap::new();
+
+    for i in 0..100 {
+        gr.add_node(i);
+    }
+
+    for i in 0..100 {
+        for j in 0..100 {
+            gr.add_edge(i, j, 55);
+        }
+    }
+
+    let p = gr
+        .par_edges()
+        .par_iter()
+        .map(|(i, (n, m), e)| {
+            assert_eq!(55, *e);
+        })
+        .collect::<Vec<_>>();
+}
